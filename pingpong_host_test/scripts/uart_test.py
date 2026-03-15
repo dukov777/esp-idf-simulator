@@ -27,30 +27,42 @@ import tty
 import serial
 
 
-def _set_raw(ser: serial.Serial) -> None:
-    """Force the underlying fd into raw mode.
-
-    pyserial applies its own termios which can re-enable echo or
-    canonical mode on a PTY.  We override that after open.
-    """
+def _open_port(port: str, baud: int) -> serial.Serial:
+    """Open the serial port, force raw mode, and flush stale data."""
+    ser = serial.Serial(port, baudrate=baud, timeout=0.5)
     fd = ser.fileno()
+
+    # Force raw mode — pyserial's termios can interfere with PTY
     tty.setraw(fd)
-    # Restore the baud rate pyserial configured
     attrs = termios.tcgetattr(fd)
     attrs[4] = attrs[5] = termios.B115200  # ispeed / ospeed
     termios.tcsetattr(fd, termios.TCSANOW, attrs)
+
+    # Flush any stale data buffered in the PTY from previous sessions
+    termios.tcflush(fd, termios.TCIFLUSH)
+    while select.select([fd], [], [], 0.05)[0]:
+        os.read(fd, 4096)
+
+    return ser
 
 
 def rx_thread(ser: serial.Serial, stop_event: threading.Event) -> None:
     """Background thread that prints incoming bytes."""
     fd = ser.fileno()
     while not stop_event.is_set():
-        r, _, _ = select.select([fd], [], [], 0.1)
+        try:
+            r, _, _ = select.select([fd], [], [], 0.1)
+        except (OSError, ValueError):
+            break
         if r:
-            data = os.read(fd, 256)
-            if data:
-                text = data.decode("utf-8", errors="replace")
-                print(f"<< {text!r}")
+            try:
+                data = os.read(fd, 256)
+            except OSError:
+                break
+            if not data:
+                break
+            text = data.decode("utf-8", errors="replace")
+            print(f"<< {text!r}")
 
 
 def interactive(ser: serial.Serial) -> None:
@@ -65,7 +77,13 @@ def interactive(ser: serial.Serial) -> None:
     try:
         while True:
             line = input(">> ")
-            ser.write(line.encode("utf-8"))
+            if not line:
+                continue
+            try:
+                ser.write(line.encode("utf-8"))
+            except OSError as e:
+                print(f"Write error: {e}")
+                break
             time.sleep(0.1)
     except (KeyboardInterrupt, EOFError):
         print("\nExiting.")
@@ -75,18 +93,27 @@ def interactive(ser: serial.Serial) -> None:
 
 
 def send_once(ser: serial.Serial, message: str) -> None:
-    """Send a message and wait briefly for a response."""
+    """Send a message and wait for a response."""
     fd = ser.fileno()
+
+    # Flush anything pending before our write
+    termios.tcflush(fd, termios.TCIFLUSH)
+    while select.select([fd], [], [], 0.02)[0]:
+        os.read(fd, 4096)
+
     print(f">> {message!r}")
     os.write(fd, message.encode("utf-8"))
 
-    # Poll for echo response
+    # Poll for response
     collected = b""
     deadline = time.time() + 2.0
     while time.time() < deadline:
         r, _, _ = select.select([fd], [], [], 0.1)
         if r:
-            collected += os.read(fd, 256)
+            chunk = os.read(fd, 256)
+            if not chunk:
+                break
+            collected += chunk
             if len(collected) >= len(message):
                 break
 
@@ -104,9 +131,15 @@ def listen(ser: serial.Serial) -> None:
         while True:
             r, _, _ = select.select([fd], [], [], 0.5)
             if r:
-                data = os.read(fd, 256)
-                if data:
-                    print(f"<< {data.decode('utf-8', errors='replace')!r}")
+                try:
+                    data = os.read(fd, 256)
+                except OSError:
+                    print("Port closed.")
+                    break
+                if not data:
+                    print("Peer disconnected.")
+                    break
+                print(f"<< {data.decode('utf-8', errors='replace')!r}")
     except KeyboardInterrupt:
         print("\nExiting.")
 
@@ -131,8 +164,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    ser = serial.Serial(args.port, baudrate=args.baud, timeout=0.5)
-    _set_raw(ser)
+    ser = _open_port(args.port, args.baud)
 
     try:
         if args.send:
