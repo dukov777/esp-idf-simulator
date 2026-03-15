@@ -91,23 +91,7 @@ Expected output:
 << 'hello'
 ```
 
-**Option B — interactive Python session:**
-
-```bash
-python3 scripts/uart_test.py
-```
-
-```
-Connected to /tmp/ttyEXT0 @ 115200
-Type a line and press Enter to send. Ctrl-C to quit.
-
->> hello
-<< 'hello'
->> world
-<< 'world'
-```
-
-**Option C — listen-only mode:**
+**Option B — listen-only mode:**
 
 ```bash
 python3 scripts/uart_test.py --listen
@@ -115,7 +99,7 @@ python3 scripts/uart_test.py --listen
 
 Prints everything the firmware sends, without transmitting.
 
-**Option D — interactive terminal with minicom:**
+**Option C — interactive terminal with minicom:**
 
 ```bash
 minicom -D /tmp/ttyEXT0 -b 115200
@@ -123,7 +107,7 @@ minicom -D /tmp/ttyEXT0 -b 115200
 
 Everything you type appears in the firmware log and is echoed back to minicom.
 
-**Option E — quick shell test:**
+**Option D — quick shell test:**
 
 ```bash
 echo "hello" > /tmp/ttyEXT0
@@ -139,8 +123,7 @@ The firmware logs the received bytes. Note: echoed data is discarded unless a re
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| Send + receive | `python3 scripts/uart_test.py --send "message"` | Sends a string, waits for the echo, prints both |
-| Interactive | `python3 scripts/uart_test.py` | Type lines to send, see responses in real time |
+| Send + receive | `python3 scripts/uart_test.py --send "message"` | Sends a string, waits for the response, prints both |
 | Listen only | `python3 scripts/uart_test.py --listen` | Prints everything received, sends nothing |
 
 ### Options
