@@ -1,6 +1,6 @@
 idf_component_register(
-    SRCS "pingpong.c"
+    SRCS "uart_echo.c"
     INCLUDE_DIRS "."
-    REQUIRES freertos
+    REQUIRES freertos esp_driver_uart
     PRIV_REQUIRES esp_system
 )

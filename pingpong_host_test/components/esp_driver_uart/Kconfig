@@ -1,0 +1,34 @@
+menu "UART Linux PTY Shim"
+
+    config UART_LINUX_PTY0_PATH
+        string "Default PTY device path for UART_NUM_0"
+        default "/tmp/ttyVESP0"
+        help
+            Filesystem path to the PTY device that UART_NUM_0 will open.
+            Override at runtime with uart_linux_set_device_path().
+
+    config UART_LINUX_PTY1_PATH
+        string "Default PTY device path for UART_NUM_1"
+        default "/tmp/ttyVESP1"
+        help
+            Filesystem path to the PTY device that UART_NUM_1 will open.
+
+    config UART_LINUX_PTY2_PATH
+        string "Default PTY device path for UART_NUM_2"
+        default "/tmp/ttyVESP2"
+        help
+            Filesystem path to the PTY device that UART_NUM_2 will open.
+
+    config UART_LINUX_RX_TASK_STACK
+        int "RX reader task stack size (bytes)"
+        default 4096
+        help
+            Stack size for the per-port RX reader task.
+
+    config UART_LINUX_RX_TASK_PRIO
+        int "RX reader task priority"
+        default 5
+        help
+            FreeRTOS priority for the per-port RX reader task.
+
+endmenu
